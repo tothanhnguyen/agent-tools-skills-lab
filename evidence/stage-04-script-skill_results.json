@@ -1,0 +1,286 @@
+[
+  {
+    "case": "threshold8",
+    "prompt": "Kiểm tra data/workload.csv, người nào vượt 8 giờ? Ghi báo cáo vào output/workload.md.",
+    "answer": "Đã kiểm tra `data/workload.csv` với ngưỡng 8 giờ:\n- **Người vượt ngưỡng (> 8 giờ):** **Lan** (9.0 giờ). Minh có 3.0 giờ.\n- **Báo cáo chi tiết:** Đã ghi vào `output/workload.md`.",
+    "error": null,
+    "conversation_id": "b7d181d45fa244579d1b5c12a1289548",
+    "run_id": "79a216bc349140dbb7b2681a9d68d6b2",
+    "model_calls": 5,
+    "tool_calls": 4,
+    "inventory": {
+      "skills": [
+        {
+          "path": "skills/csv-quality/SKILL.md",
+          "message_index": 2,
+          "tool_call_id": "call_688479",
+          "skill": "csv-quality",
+          "chars": 3214,
+          "first_request": "Lượt 1, model call #2"
+        }
+      ],
+      "resources": [
+        {
+          "path": "skills/csv-quality/references/report-template.md",
+          "message_index": 4,
+          "tool_call_id": "call_885440"
+        }
+      ]
+    },
+    "tools": [
+      {
+        "sequence": 5,
+        "tool_call_id": "call_688479",
+        "name": "read_file",
+        "arguments": {
+          "path": "skills/csv-quality/SKILL.md"
+        },
+        "result": {
+          "ok": true,
+          "path": "skills/csv-quality/SKILL.md",
+          "content": "---\nname: csv-quality\ndescription: Kiểm tra chất lượng CSV công việc (task_id, owner, hours), tính tổng giờ theo người và xác định người quá tải theo ngưỡng người dùng cung cấp bằng script có sẵn; ghi báo cáo Markdown dưới output/. Dùng khi người dùng yêu cầu kiểm tra CSV công việc, tổng giờ theo owner, người vượt ngưỡng hoặc quá tải công việc.\n---\n\n# CSV quality và workload\n\n## Xác nhận đầu vào\n\n1. Cần đường dẫn CSV và ngưỡng tối đa giờ cho **yêu cầu hiện tại**. Nếu thiếu ngưỡng, hỏi lại trước khi chạy phân tích hoặc kết luận người quá tải. Không mặc định ngưỡng, không dùng ngưỡng từ cuộc trò chuyện/lượt yêu cầu cũ. Quy tắc này cũng áp dụng khi người dùng chỉ hỏi chất lượng CSV vì CLI yêu cầu ngưỡng.\n2. Ngưỡng là số hữu hạn không âm; giá trị 0 hợp lệ. Nếu không rõ, âm hoặc không hữu hạn, hỏi ngưỡng hợp lệ.\n3. Đọc `references/report-template.md`, tức `skills/csv-quality/references/report-template.md`, để dùng cấu trúc báo cáo.\n\n## Chạy script\n\nDùng tool `bash` có cwd là workspace:\n\n```text\npython skills/csv-quality/scripts/check_csv.py --input <đường dẫn CSV> --max-hours <ngưỡng trong yêu cầu hiện tại>\n```\n\nĐường dẫn trong lệnh tương đối workspace, không thêm `workspace/`. Quote đường dẫn nếu có khoảng trắng. Không cần đọc source script để chạy. Không tự tính số liệu bằng mắt hoặc tự viết thuật toán thay thế script này.\n\n## Diễn giải JSON\n\n- Exit 0 và ok=true, timed_out=false: phân tích thành công, kể cả có lỗi chất lượng dữ liệu hoặc người quá tải. Lấy số liệu từ stdout JSON.\n- Giữ các trường chất lượng `row_count`, `missing_owner_count`, `invalid_hours_count`, `duplicate_id_count`, `duplicate_ids`, `issues`; chúng phân tích toàn bộ dòng dữ liệu không trống.\n- `max_hours` là ngưỡng đã truyền; `hours_by_owner` là tổng giờ từ những dòng được chấp nhận; `overloaded_owners` là người có tổng **lớn hơn** ngưỡng, bằng ngưỡng không quá tải.\n- Chuẩn hóa khoảng trắng nhưng không gộp tên owner khác hoa/thường. Mỗi task_id không rỗng giữ lần xuất hiện đầu tiên, kể cả lần đầu không hợp lệ. Dòng sau không thay thế lần đầu.\n- `excluded_rows` liệt kê mỗi dòng bị loại một lần cùng tất cả reasons: wrong_field_count, missing_task_id, duplicate_id, missing_owner, invalid_hours. Header là line 1. Giờ 0 hợp lệ.\n- Dữ liệu lỗi vẫn có thể có tổng giờ hợp lệ của các dòng được chấp nhận. Không bỏ toàn bộ kết quả chỉ vì có issues; nêu rõ tổng giờ này loại các dòng sai và trùng.\n- Exit khác 0, timed_out=true hoặc ok=false: đọc stderr/error và báo không phân tích được. Không đưa tổng giờ, không ghi báo cáo như thể thành công. Thiếu ngưỡng/CLI không hợp lệ cũng là lỗi thực thi.\n\n## Báo cáo\n\n1. Dùng template đã đọc; ghi ngưỡng, bảng tổng theo người, danh sách vượt ngưỡng (hoặc Không có), excluded_rows với line/task_id/reasons và các thống kê/chi tiết chất lượng cũ.\n2. Lấy mọi con số từ JSON; không tự thêm owner, giờ hay dòng được chấp nhận. Nêu tổng tính trên dữ liệu đã lọc và quy tắc lần xuất hiện đầu tiên.\n3. Không sửa CSV. Chỉ đề xuất cách sửa trong phần khuyến nghị.\n4. Nếu người dùng yêu cầu lưu báo cáo, dùng `write_file` vào đường dẫn chỉ định (mặc định `output/csv-quality.md`). Chỉ xác nhận đã ghi sau tool result thành công. Nếu không yêu cầu file, trả kết quả theo cùng cấu trúc.\n"
+        }
+      },
+      {
+        "sequence": 9,
+        "tool_call_id": "call_885440",
+        "name": "read_file",
+        "arguments": {
+          "path": "skills/csv-quality/references/report-template.md"
+        },
+        "result": {
+          "ok": true,
+          "path": "skills/csv-quality/references/report-template.md",
+          "content": "# Báo cáo chất lượng và quá tải: `{đường dẫn CSV}`\n\nNguồn: `{đường dẫn CSV}` | Script: `skills/csv-quality/scripts/check_csv.py` | Exit: {exit_code}\n\n## Ngưỡng và tổng giờ\n\nNgưỡng: **{max_hours} giờ**. Quá tải khi tổng giờ **lớn hơn** ngưỡng; bằng ngưỡng không quá tải.\nTổng chỉ bao gồm dòng hợp lệ, không trùng. Mỗi ID giữ lần xuất hiện đầu tiên kể cả khi lần đầu lỗi; các dòng trống bỏ qua.\n\n| Owner | Tổng giờ | Trạng thái theo overloaded_owners |\n|---|---|---|\n| {owner từ hours_by_owner} | {total_hours} | {vượt ngưỡng / không vượt} |\n\n## Người quá tải\n\n{Danh sách owner và total_hours lấy từ overloaded_owners; nếu danh sách rỗng ghi Không có người quá tải.}\n\n## Dòng bị loại\n\n| Line | task_id | Tất cả reasons |\n|---|---|---|\n| {line} | {task_id hoặc null} | {reasons theo JSON} |\n\nMã: wrong_field_count = sai số trường; missing_task_id = thiếu ID; duplicate_id = ID trùng; missing_owner = thiếu người phụ trách; invalid_hours = giờ không hữu hạn/âm/không phải số.\n\n## Chất lượng toàn bộ dữ liệu\n\n| Chỉ số | Giá trị |\n|---|---|\n| Số dòng dữ liệu không trống | {row_count} |\n| Dòng thiếu owner | {missing_owner_count} |\n| Dòng hours không hợp lệ | {invalid_hours_count} |\n| Số ID trùng (distinct) | {duplicate_id_count} ({duplicate_ids}) |\n\n## Chi tiết lỗi\n\n| Line | Cột | Loại | task_id | Mô tả |\n|---|---|---|---|---|\n| {line} | {column} | {type} | {task_id} | {message} |\n\n## Đánh giá và khuyến nghị\n\n{Giới hạn của tổng đã lọc; đề xuất sửa dữ liệu. Không sửa đầu vào. Không bịa số liệu ngoài JSON.}\n"
+        }
+      },
+      {
+        "sequence": 13,
+        "tool_call_id": "call_565406",
+        "name": "bash",
+        "arguments": {
+          "command": "python skills/csv-quality/scripts/check_csv.py --input data/workload.csv --max-hours 8"
+        },
+        "result": {
+          "ok": true,
+          "exit_code": 0,
+          "stdout": "{\n  \"input\": \"data/workload.csv\",\n  \"row_count\": 6,\n  \"missing_owner_count\": 1,\n  \"invalid_hours_count\": 1,\n  \"duplicate_id_count\": 1,\n  \"duplicate_ids\": [\n    \"T02\"\n  ],\n  \"issues\": [\n    {\n      \"line\": 5,\n      \"column\": \"hours\",\n      \"type\": \"invalid_hours\",\n      \"task_id\": \"T04\",\n      \"value\": \"abc\",\n      \"message\": \"hours 'abc' không phải số hữu hạn không âm.\"\n    },\n    {\n      \"line\": 6,\n      \"column\": \"task_id\",\n      \"type\": \"duplicate_id\",\n      \"task_id\": \"T02\",\n      \"message\": \"task_id T02 đã xuất hiện ở line 3.\"\n    },\n    {\n      \"line\": 7,\n      \"column\": \"owner\",\n      \"type\": \"missing_owner\",\n      \"task_id\": \"T05\",\n      \"message\": \"owner trống.\"\n    }\n  ],\n  \"max_hours\": 8.0,\n  \"hours_by_owner\": {\n    \"Lan\": 9.0,\n    \"Minh\": 3.0\n  },\n  \"overloaded_owners\": [\n    {\n      \"owner\": \"Lan\",\n      \"total_hours\": 9.0\n    }\n  ],\n  \"excluded_rows\": [\n    {\n      \"line\": 5,\n      \"task_id\": \"T04\",\n      \"reasons\": [\n        \"invalid_hours\"\n      ]\n    },\n    {\n      \"line\": 6,\n      \"task_id\": \"T02\",\n      \"reasons\": [\n        \"duplicate_id\"\n      ]\n    },\n    {\n      \"line\": 7,\n      \"task_id\": \"T05\",\n      \"reasons\": [\n        \"missing_owner\"\n      ]\n    }\n  ]\n}\n",
+          "stderr": "",
+          "timed_out": false,
+          "truncated": false
+        }
+      },
+      {
+        "sequence": 17,
+        "tool_call_id": "call_887058",
+        "name": "write_file",
+        "arguments": {
+          "path": "output/workload.md",
+          "content": "# Báo cáo chất lượng và quá tải: `data/workload.csv`\n\nNguồn: `data/workload.csv` | Script: `skills/csv-quality/scripts/check_csv.py` | Exit: 0\n\n## Ngưỡng và tổng giờ\n\nNgưỡng: **8.0 giờ**. Quá tải khi tổng giờ **lớn hơn** ngưỡng; bằng ngưỡng không quá tải.\nTổng chỉ bao gồm dòng hợp lệ, không trùng. Mỗi ID giữ lần xuất hiện đầu tiên kể cả khi lần đầu lỗi; các dòng trống bỏ qua.\n\n| Owner | Tổng giờ | Trạng thái theo overloaded_owners |\n|---|---|---|\n| Lan | 9.0 | Vượt ngưỡng |\n| Minh | 3.0 | Không vượt |\n\n## Người quá tải\n\n- **Lan**: 9.0 giờ\n\n## Dòng bị loại\n\n| Line | task_id | Tất cả reasons |\n|---|---|---|\n| 5 | T04 | invalid_hours |\n| 6 | T02 | duplicate_id |\n| 7 | T05 | missing_owner |\n\nMã: wrong_field_count = sai số trường; missing_task_id = thiếu ID; duplicate_id = ID trùng; missing_owner = thiếu người phụ trách; invalid_hours = giờ không hữu hạn/âm/không phải số.\n\n## Chất lượng toàn bộ dữ liệu\n\n| Chỉ số | Giá trị |\n|---|---|\n| Số dòng dữ liệu không trống | 6 |\n| Dòng thiếu owner | 1 |\n| Dòng hours không hợp lệ | 1 |\n| Số ID trùng (distinct) | 1 (T02) |\n\n## Chi tiết lỗi\n\n| Line | Cột | Loại | task_id | Mô tả |\n|---|---|---|---|---|\n| 5 | hours | invalid_hours | T04 | hours 'abc' không phải số hữu hạn không âm. |\n| 6 | task_id | duplicate_id | T02 | task_id T02 đã xuất hiện ở line 3. |\n| 7 | owner | missing_owner | T05 | owner trống. |\n\n## Đánh giá và khuyến nghị\n\nTổng giờ được tính trên các dòng hợp lệ, không trùng (loại bỏ các dòng bị lỗi cấu trúc/dữ liệu). Dữ liệu có các vấn đề cần khắc phục: dòng 5 có giờ không hợp lệ ('abc'), dòng 6 bị trùng task_id (T02), và dòng 7 thiếu owner. Cần chuẩn hóa lại file CSV nguồn để đảm bảo độ chính xác của workload.\n"
+        },
+        "result": {
+          "ok": true,
+          "path": "output/workload.md",
+          "bytes": 2014,
+          "status": "created"
+        }
+      }
+    ],
+    "trace": "evidence/stage-04-script-skill_threshold8.jsonl",
+    "input_sha256_before": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "input_sha256_after": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "model": "gemini-3.5-flash-lite"
+  },
+  {
+    "case": "threshold9",
+    "prompt": "Kiểm tra data/workload.csv, người nào vượt 9 giờ? Ghi báo cáo vào output/workload-9.md.",
+    "answer": "Đã kiểm tra xong file `data/workload.csv` với ngưỡng 9 giờ.\n\n- **Kết quả tổng giờ theo owner**: Lan (9.0 giờ), Minh (3.0 giờ).\n- **Người vượt 9 giờ**: Không có (Lan đạt đúng 9 giờ, Minh đạt 3.0 giờ; lưu ý quy định quá tải là **lớn hơn** ngưỡng).\n- **Báo cáo chi tiết**: Đã được ghi vào file `output/workload-9.md`.",
+    "error": null,
+    "conversation_id": "8f231232443c46bf8febed539ff1c384",
+    "run_id": "263c70dc106d4f25849b4a0222e59fec",
+    "model_calls": 5,
+    "tool_calls": 4,
+    "inventory": {
+      "skills": [
+        {
+          "path": "skills/csv-quality/SKILL.md",
+          "message_index": 2,
+          "tool_call_id": "call_784291",
+          "skill": "csv-quality",
+          "chars": 3214,
+          "first_request": "Lượt 1, model call #2"
+        }
+      ],
+      "resources": [
+        {
+          "path": "skills/csv-quality/references/report-template.md",
+          "message_index": 4,
+          "tool_call_id": "call_328544"
+        }
+      ]
+    },
+    "tools": [
+      {
+        "sequence": 5,
+        "tool_call_id": "call_784291",
+        "name": "read_file",
+        "arguments": {
+          "path": "skills/csv-quality/SKILL.md"
+        },
+        "result": {
+          "ok": true,
+          "path": "skills/csv-quality/SKILL.md",
+          "content": "---\nname: csv-quality\ndescription: Kiểm tra chất lượng CSV công việc (task_id, owner, hours), tính tổng giờ theo người và xác định người quá tải theo ngưỡng người dùng cung cấp bằng script có sẵn; ghi báo cáo Markdown dưới output/. Dùng khi người dùng yêu cầu kiểm tra CSV công việc, tổng giờ theo owner, người vượt ngưỡng hoặc quá tải công việc.\n---\n\n# CSV quality và workload\n\n## Xác nhận đầu vào\n\n1. Cần đường dẫn CSV và ngưỡng tối đa giờ cho **yêu cầu hiện tại**. Nếu thiếu ngưỡng, hỏi lại trước khi chạy phân tích hoặc kết luận người quá tải. Không mặc định ngưỡng, không dùng ngưỡng từ cuộc trò chuyện/lượt yêu cầu cũ. Quy tắc này cũng áp dụng khi người dùng chỉ hỏi chất lượng CSV vì CLI yêu cầu ngưỡng.\n2. Ngưỡng là số hữu hạn không âm; giá trị 0 hợp lệ. Nếu không rõ, âm hoặc không hữu hạn, hỏi ngưỡng hợp lệ.\n3. Đọc `references/report-template.md`, tức `skills/csv-quality/references/report-template.md`, để dùng cấu trúc báo cáo.\n\n## Chạy script\n\nDùng tool `bash` có cwd là workspace:\n\n```text\npython skills/csv-quality/scripts/check_csv.py --input <đường dẫn CSV> --max-hours <ngưỡng trong yêu cầu hiện tại>\n```\n\nĐường dẫn trong lệnh tương đối workspace, không thêm `workspace/`. Quote đường dẫn nếu có khoảng trắng. Không cần đọc source script để chạy. Không tự tính số liệu bằng mắt hoặc tự viết thuật toán thay thế script này.\n\n## Diễn giải JSON\n\n- Exit 0 và ok=true, timed_out=false: phân tích thành công, kể cả có lỗi chất lượng dữ liệu hoặc người quá tải. Lấy số liệu từ stdout JSON.\n- Giữ các trường chất lượng `row_count`, `missing_owner_count`, `invalid_hours_count`, `duplicate_id_count`, `duplicate_ids`, `issues`; chúng phân tích toàn bộ dòng dữ liệu không trống.\n- `max_hours` là ngưỡng đã truyền; `hours_by_owner` là tổng giờ từ những dòng được chấp nhận; `overloaded_owners` là người có tổng **lớn hơn** ngưỡng, bằng ngưỡng không quá tải.\n- Chuẩn hóa khoảng trắng nhưng không gộp tên owner khác hoa/thường. Mỗi task_id không rỗng giữ lần xuất hiện đầu tiên, kể cả lần đầu không hợp lệ. Dòng sau không thay thế lần đầu.\n- `excluded_rows` liệt kê mỗi dòng bị loại một lần cùng tất cả reasons: wrong_field_count, missing_task_id, duplicate_id, missing_owner, invalid_hours. Header là line 1. Giờ 0 hợp lệ.\n- Dữ liệu lỗi vẫn có thể có tổng giờ hợp lệ của các dòng được chấp nhận. Không bỏ toàn bộ kết quả chỉ vì có issues; nêu rõ tổng giờ này loại các dòng sai và trùng.\n- Exit khác 0, timed_out=true hoặc ok=false: đọc stderr/error và báo không phân tích được. Không đưa tổng giờ, không ghi báo cáo như thể thành công. Thiếu ngưỡng/CLI không hợp lệ cũng là lỗi thực thi.\n\n## Báo cáo\n\n1. Dùng template đã đọc; ghi ngưỡng, bảng tổng theo người, danh sách vượt ngưỡng (hoặc Không có), excluded_rows với line/task_id/reasons và các thống kê/chi tiết chất lượng cũ.\n2. Lấy mọi con số từ JSON; không tự thêm owner, giờ hay dòng được chấp nhận. Nêu tổng tính trên dữ liệu đã lọc và quy tắc lần xuất hiện đầu tiên.\n3. Không sửa CSV. Chỉ đề xuất cách sửa trong phần khuyến nghị.\n4. Nếu người dùng yêu cầu lưu báo cáo, dùng `write_file` vào đường dẫn chỉ định (mặc định `output/csv-quality.md`). Chỉ xác nhận đã ghi sau tool result thành công. Nếu không yêu cầu file, trả kết quả theo cùng cấu trúc.\n"
+        }
+      },
+      {
+        "sequence": 9,
+        "tool_call_id": "call_328544",
+        "name": "read_file",
+        "arguments": {
+          "path": "skills/csv-quality/references/report-template.md"
+        },
+        "result": {
+          "ok": true,
+          "path": "skills/csv-quality/references/report-template.md",
+          "content": "# Báo cáo chất lượng và quá tải: `{đường dẫn CSV}`\n\nNguồn: `{đường dẫn CSV}` | Script: `skills/csv-quality/scripts/check_csv.py` | Exit: {exit_code}\n\n## Ngưỡng và tổng giờ\n\nNgưỡng: **{max_hours} giờ**. Quá tải khi tổng giờ **lớn hơn** ngưỡng; bằng ngưỡng không quá tải.\nTổng chỉ bao gồm dòng hợp lệ, không trùng. Mỗi ID giữ lần xuất hiện đầu tiên kể cả khi lần đầu lỗi; các dòng trống bỏ qua.\n\n| Owner | Tổng giờ | Trạng thái theo overloaded_owners |\n|---|---|---|\n| {owner từ hours_by_owner} | {total_hours} | {vượt ngưỡng / không vượt} |\n\n## Người quá tải\n\n{Danh sách owner và total_hours lấy từ overloaded_owners; nếu danh sách rỗng ghi Không có người quá tải.}\n\n## Dòng bị loại\n\n| Line | task_id | Tất cả reasons |\n|---|---|---|\n| {line} | {task_id hoặc null} | {reasons theo JSON} |\n\nMã: wrong_field_count = sai số trường; missing_task_id = thiếu ID; duplicate_id = ID trùng; missing_owner = thiếu người phụ trách; invalid_hours = giờ không hữu hạn/âm/không phải số.\n\n## Chất lượng toàn bộ dữ liệu\n\n| Chỉ số | Giá trị |\n|---|---|\n| Số dòng dữ liệu không trống | {row_count} |\n| Dòng thiếu owner | {missing_owner_count} |\n| Dòng hours không hợp lệ | {invalid_hours_count} |\n| Số ID trùng (distinct) | {duplicate_id_count} ({duplicate_ids}) |\n\n## Chi tiết lỗi\n\n| Line | Cột | Loại | task_id | Mô tả |\n|---|---|---|---|---|\n| {line} | {column} | {type} | {task_id} | {message} |\n\n## Đánh giá và khuyến nghị\n\n{Giới hạn của tổng đã lọc; đề xuất sửa dữ liệu. Không sửa đầu vào. Không bịa số liệu ngoài JSON.}\n"
+        }
+      },
+      {
+        "sequence": 13,
+        "tool_call_id": "call_595791",
+        "name": "bash",
+        "arguments": {
+          "command": "python skills/csv-quality/scripts/check_csv.py --input data/workload.csv --max-hours 9"
+        },
+        "result": {
+          "ok": true,
+          "exit_code": 0,
+          "stdout": "{\n  \"input\": \"data/workload.csv\",\n  \"row_count\": 6,\n  \"missing_owner_count\": 1,\n  \"invalid_hours_count\": 1,\n  \"duplicate_id_count\": 1,\n  \"duplicate_ids\": [\n    \"T02\"\n  ],\n  \"issues\": [\n    {\n      \"line\": 5,\n      \"column\": \"hours\",\n      \"type\": \"invalid_hours\",\n      \"task_id\": \"T04\",\n      \"value\": \"abc\",\n      \"message\": \"hours 'abc' không phải số hữu hạn không âm.\"\n    },\n    {\n      \"line\": 6,\n      \"column\": \"task_id\",\n      \"type\": \"duplicate_id\",\n      \"task_id\": \"T02\",\n      \"message\": \"task_id T02 đã xuất hiện ở line 3.\"\n    },\n    {\n      \"line\": 7,\n      \"column\": \"owner\",\n      \"type\": \"missing_owner\",\n      \"task_id\": \"T05\",\n      \"message\": \"owner trống.\"\n    }\n  ],\n  \"max_hours\": 9.0,\n  \"hours_by_owner\": {\n    \"Lan\": 9.0,\n    \"Minh\": 3.0\n  },\n  \"overloaded_owners\": [],\n  \"excluded_rows\": [\n    {\n      \"line\": 5,\n      \"task_id\": \"T04\",\n      \"reasons\": [\n        \"invalid_hours\"\n      ]\n    },\n    {\n      \"line\": 6,\n      \"task_id\": \"T02\",\n      \"reasons\": [\n        \"duplicate_id\"\n      ]\n    },\n    {\n      \"line\": 7,\n      \"task_id\": \"T05\",\n      \"reasons\": [\n        \"missing_owner\"\n      ]\n    }\n  ]\n}\n",
+          "stderr": "",
+          "timed_out": false,
+          "truncated": false
+        }
+      },
+      {
+        "sequence": 17,
+        "tool_call_id": "call_327665",
+        "name": "write_file",
+        "arguments": {
+          "path": "output/workload-9.md",
+          "content": "# Báo cáo chất lượng và quá tải: `data/workload.csv`\n\nNguồn: `data/workload.csv` | Script: `skills/csv-quality/scripts/check_csv.py` | Exit: 0\n\n## Ngưỡng và tổng giờ\n\nNgưỡng: **9.0 giờ**. Quá tải khi tổng giờ **lớn hơn** ngưỡng; bằng ngưỡng không quá tải.\nTổng chỉ bao gồm dòng hợp lệ, không trùng. Mỗi ID giữ lần xuất hiện đầu tiên kể cả khi lần đầu lỗi; các dòng trống bỏ qua.\n\n| Owner | Tổng giờ | Trạng thái theo overloaded_owners |\n|---|---|---|\n| Lan | 9.0 | không vượt |\n| Minh | 3.0 | không vượt |\n\n## Người quá tải\n\nKhông có người quá tải.\n\n## Dòng bị loại\n\n| Line | task_id | Tất cả reasons |\n|---|---|---|\n| 5 | T04 | invalid_hours |\n| 6 | T02 | duplicate_id |\n| 7 | T05 | missing_owner |\n\nMã: wrong_field_count = sai số trường; missing_task_id = thiếu ID; duplicate_id = ID trùng; missing_owner = thiếu người phụ trách; invalid_hours = giờ không hữu hạn/âm/không phải số.\n\n## Chất lượng toàn bộ dữ liệu\n\n| Chỉ số | Giá trị |\n|---|---|\n| Số dòng dữ liệu không trống | 6 |\n| Dòng thiếu owner | 1 |\n| Dòng hours không hợp lệ | 1 |\n| Số ID trùng (distinct) | 1 (T02) |\n\n## Chi tiết lỗi\n\n| Line | Cột | Loại | task_id | Mô tả |\n|---|---|---|---|---|\n| 5 | hours | invalid_hours | T04 | hours 'abc' không phải số hữu hạn không âm. |\n| 6 | task_id | duplicate_id | T02 | task_id T02 đã xuất hiện ở line 3. |\n| 7 | owner | missing_owner | T05 | owner trống. |\n\n## Đánh giá và khuyến nghị\n\nTổng giờ trên chỉ tính các dòng hợp lệ, không trùng và tuân thủ quy tắc giữ lần xuất hiện đầu tiên của task_id. Dữ liệu có lỗi về giờ (line 5), trùng lặp ID (line 6) và thiếu owner (line 7). Cần cập nhật lại file CSV để sửa các lỗi dữ liệu này trước khi phân tích chính thức tiếp theo.\n"
+        },
+        "result": {
+          "ok": true,
+          "path": "output/workload-9.md",
+          "bytes": 2004,
+          "status": "created"
+        }
+      }
+    ],
+    "trace": "evidence/stage-04-script-skill_threshold9.jsonl",
+    "input_sha256_before": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "input_sha256_after": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "model": "gemini-3.5-flash-lite"
+  },
+  {
+    "case": "missing_threshold",
+    "prompt": "Tính tổng giờ theo người trong data/workload.csv và xác định người quá tải.",
+    "answer": "Theo quy tắc của skill `csv-quality`, khi kiểm tra workload và xác định người quá tải, bạn cần cung cấp **ngưỡng tối đa giờ** (ví dụ: `--max-hours 40`) vì không có ngưỡng mặc định. \n\nVui lòng cung cấp ngưỡng giờ để tôi có thể chạy phân tích chính xác cho file `data/workload.csv`.",
+    "error": null,
+    "conversation_id": "310e78341f9b40b399561870c10d7e08",
+    "run_id": "0568339ea1a24207af8fb627267808bb",
+    "model_calls": 2,
+    "tool_calls": 1,
+    "inventory": {
+      "skills": [
+        {
+          "path": "skills/csv-quality/SKILL.md",
+          "message_index": 2,
+          "tool_call_id": "call_603320",
+          "skill": "csv-quality",
+          "chars": 3214,
+          "first_request": "Lượt 1, model call #2"
+        }
+      ],
+      "resources": []
+    },
+    "tools": [
+      {
+        "sequence": 5,
+        "tool_call_id": "call_603320",
+        "name": "read_file",
+        "arguments": {
+          "path": "skills/csv-quality/SKILL.md"
+        },
+        "result": {
+          "ok": true,
+          "path": "skills/csv-quality/SKILL.md",
+          "content": "---\nname: csv-quality\ndescription: Kiểm tra chất lượng CSV công việc (task_id, owner, hours), tính tổng giờ theo người và xác định người quá tải theo ngưỡng người dùng cung cấp bằng script có sẵn; ghi báo cáo Markdown dưới output/. Dùng khi người dùng yêu cầu kiểm tra CSV công việc, tổng giờ theo owner, người vượt ngưỡng hoặc quá tải công việc.\n---\n\n# CSV quality và workload\n\n## Xác nhận đầu vào\n\n1. Cần đường dẫn CSV và ngưỡng tối đa giờ cho **yêu cầu hiện tại**. Nếu thiếu ngưỡng, hỏi lại trước khi chạy phân tích hoặc kết luận người quá tải. Không mặc định ngưỡng, không dùng ngưỡng từ cuộc trò chuyện/lượt yêu cầu cũ. Quy tắc này cũng áp dụng khi người dùng chỉ hỏi chất lượng CSV vì CLI yêu cầu ngưỡng.\n2. Ngưỡng là số hữu hạn không âm; giá trị 0 hợp lệ. Nếu không rõ, âm hoặc không hữu hạn, hỏi ngưỡng hợp lệ.\n3. Đọc `references/report-template.md`, tức `skills/csv-quality/references/report-template.md`, để dùng cấu trúc báo cáo.\n\n## Chạy script\n\nDùng tool `bash` có cwd là workspace:\n\n```text\npython skills/csv-quality/scripts/check_csv.py --input <đường dẫn CSV> --max-hours <ngưỡng trong yêu cầu hiện tại>\n```\n\nĐường dẫn trong lệnh tương đối workspace, không thêm `workspace/`. Quote đường dẫn nếu có khoảng trắng. Không cần đọc source script để chạy. Không tự tính số liệu bằng mắt hoặc tự viết thuật toán thay thế script này.\n\n## Diễn giải JSON\n\n- Exit 0 và ok=true, timed_out=false: phân tích thành công, kể cả có lỗi chất lượng dữ liệu hoặc người quá tải. Lấy số liệu từ stdout JSON.\n- Giữ các trường chất lượng `row_count`, `missing_owner_count`, `invalid_hours_count`, `duplicate_id_count`, `duplicate_ids`, `issues`; chúng phân tích toàn bộ dòng dữ liệu không trống.\n- `max_hours` là ngưỡng đã truyền; `hours_by_owner` là tổng giờ từ những dòng được chấp nhận; `overloaded_owners` là người có tổng **lớn hơn** ngưỡng, bằng ngưỡng không quá tải.\n- Chuẩn hóa khoảng trắng nhưng không gộp tên owner khác hoa/thường. Mỗi task_id không rỗng giữ lần xuất hiện đầu tiên, kể cả lần đầu không hợp lệ. Dòng sau không thay thế lần đầu.\n- `excluded_rows` liệt kê mỗi dòng bị loại một lần cùng tất cả reasons: wrong_field_count, missing_task_id, duplicate_id, missing_owner, invalid_hours. Header là line 1. Giờ 0 hợp lệ.\n- Dữ liệu lỗi vẫn có thể có tổng giờ hợp lệ của các dòng được chấp nhận. Không bỏ toàn bộ kết quả chỉ vì có issues; nêu rõ tổng giờ này loại các dòng sai và trùng.\n- Exit khác 0, timed_out=true hoặc ok=false: đọc stderr/error và báo không phân tích được. Không đưa tổng giờ, không ghi báo cáo như thể thành công. Thiếu ngưỡng/CLI không hợp lệ cũng là lỗi thực thi.\n\n## Báo cáo\n\n1. Dùng template đã đọc; ghi ngưỡng, bảng tổng theo người, danh sách vượt ngưỡng (hoặc Không có), excluded_rows với line/task_id/reasons và các thống kê/chi tiết chất lượng cũ.\n2. Lấy mọi con số từ JSON; không tự thêm owner, giờ hay dòng được chấp nhận. Nêu tổng tính trên dữ liệu đã lọc và quy tắc lần xuất hiện đầu tiên.\n3. Không sửa CSV. Chỉ đề xuất cách sửa trong phần khuyến nghị.\n4. Nếu người dùng yêu cầu lưu báo cáo, dùng `write_file` vào đường dẫn chỉ định (mặc định `output/csv-quality.md`). Chỉ xác nhận đã ghi sau tool result thành công. Nếu không yêu cầu file, trả kết quả theo cùng cấu trúc.\n"
+        }
+      }
+    ],
+    "trace": "evidence/stage-04-script-skill_missing_threshold.jsonl",
+    "input_sha256_before": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "input_sha256_after": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "model": "gemini-3.5-flash-lite"
+  },
+  {
+    "case": "missing_file",
+    "prompt": "Kiểm tra data/not-found.csv, người nào vượt 8 giờ? Ghi báo cáo vào output/not-found.md.",
+    "answer": "Tool `bash` đã chạy lệnh kiểm tra CSV nhưng trả về lỗi với `exit_code: 1`:\n\n```\nERROR: Không đọc được file data/not-found.csv: No such file or directory\n```\n\nFile `data/not-found.csv` không tồn tại trong workspace, do đó không thể kiểm tra, xác định người vượt ngưỡng 8 giờ hay ghi báo cáo vào `output/not-found.md`. Bạn vui lòng kiểm tra lại đường dẫn file CSV nhé!",
+    "error": null,
+    "conversation_id": "cc7146e8241340359e5454707315cce3",
+    "run_id": "60645ff6679a4680a4bf44c92dfce0e5",
+    "model_calls": 3,
+    "tool_calls": 2,
+    "inventory": {
+      "skills": [
+        {
+          "path": "skills/csv-quality/SKILL.md",
+          "message_index": 2,
+          "tool_call_id": "call_525653",
+          "skill": "csv-quality",
+          "chars": 3214,
+          "first_request": "Lượt 1, model call #2"
+        }
+      ],
+      "resources": []
+    },
+    "tools": [
+      {
+        "sequence": 5,
+        "tool_call_id": "call_525653",
+        "name": "read_file",
+        "arguments": {
+          "path": "skills/csv-quality/SKILL.md"
+        },
+        "result": {
+          "ok": true,
+          "path": "skills/csv-quality/SKILL.md",
+          "content": "---\nname: csv-quality\ndescription: Kiểm tra chất lượng CSV công việc (task_id, owner, hours), tính tổng giờ theo người và xác định người quá tải theo ngưỡng người dùng cung cấp bằng script có sẵn; ghi báo cáo Markdown dưới output/. Dùng khi người dùng yêu cầu kiểm tra CSV công việc, tổng giờ theo owner, người vượt ngưỡng hoặc quá tải công việc.\n---\n\n# CSV quality và workload\n\n## Xác nhận đầu vào\n\n1. Cần đường dẫn CSV và ngưỡng tối đa giờ cho **yêu cầu hiện tại**. Nếu thiếu ngưỡng, hỏi lại trước khi chạy phân tích hoặc kết luận người quá tải. Không mặc định ngưỡng, không dùng ngưỡng từ cuộc trò chuyện/lượt yêu cầu cũ. Quy tắc này cũng áp dụng khi người dùng chỉ hỏi chất lượng CSV vì CLI yêu cầu ngưỡng.\n2. Ngưỡng là số hữu hạn không âm; giá trị 0 hợp lệ. Nếu không rõ, âm hoặc không hữu hạn, hỏi ngưỡng hợp lệ.\n3. Đọc `references/report-template.md`, tức `skills/csv-quality/references/report-template.md`, để dùng cấu trúc báo cáo.\n\n## Chạy script\n\nDùng tool `bash` có cwd là workspace:\n\n```text\npython skills/csv-quality/scripts/check_csv.py --input <đường dẫn CSV> --max-hours <ngưỡng trong yêu cầu hiện tại>\n```\n\nĐường dẫn trong lệnh tương đối workspace, không thêm `workspace/`. Quote đường dẫn nếu có khoảng trắng. Không cần đọc source script để chạy. Không tự tính số liệu bằng mắt hoặc tự viết thuật toán thay thế script này.\n\n## Diễn giải JSON\n\n- Exit 0 và ok=true, timed_out=false: phân tích thành công, kể cả có lỗi chất lượng dữ liệu hoặc người quá tải. Lấy số liệu từ stdout JSON.\n- Giữ các trường chất lượng `row_count`, `missing_owner_count`, `invalid_hours_count`, `duplicate_id_count`, `duplicate_ids`, `issues`; chúng phân tích toàn bộ dòng dữ liệu không trống.\n- `max_hours` là ngưỡng đã truyền; `hours_by_owner` là tổng giờ từ những dòng được chấp nhận; `overloaded_owners` là người có tổng **lớn hơn** ngưỡng, bằng ngưỡng không quá tải.\n- Chuẩn hóa khoảng trắng nhưng không gộp tên owner khác hoa/thường. Mỗi task_id không rỗng giữ lần xuất hiện đầu tiên, kể cả lần đầu không hợp lệ. Dòng sau không thay thế lần đầu.\n- `excluded_rows` liệt kê mỗi dòng bị loại một lần cùng tất cả reasons: wrong_field_count, missing_task_id, duplicate_id, missing_owner, invalid_hours. Header là line 1. Giờ 0 hợp lệ.\n- Dữ liệu lỗi vẫn có thể có tổng giờ hợp lệ của các dòng được chấp nhận. Không bỏ toàn bộ kết quả chỉ vì có issues; nêu rõ tổng giờ này loại các dòng sai và trùng.\n- Exit khác 0, timed_out=true hoặc ok=false: đọc stderr/error và báo không phân tích được. Không đưa tổng giờ, không ghi báo cáo như thể thành công. Thiếu ngưỡng/CLI không hợp lệ cũng là lỗi thực thi.\n\n## Báo cáo\n\n1. Dùng template đã đọc; ghi ngưỡng, bảng tổng theo người, danh sách vượt ngưỡng (hoặc Không có), excluded_rows với line/task_id/reasons và các thống kê/chi tiết chất lượng cũ.\n2. Lấy mọi con số từ JSON; không tự thêm owner, giờ hay dòng được chấp nhận. Nêu tổng tính trên dữ liệu đã lọc và quy tắc lần xuất hiện đầu tiên.\n3. Không sửa CSV. Chỉ đề xuất cách sửa trong phần khuyến nghị.\n4. Nếu người dùng yêu cầu lưu báo cáo, dùng `write_file` vào đường dẫn chỉ định (mặc định `output/csv-quality.md`). Chỉ xác nhận đã ghi sau tool result thành công. Nếu không yêu cầu file, trả kết quả theo cùng cấu trúc.\n"
+        }
+      },
+      {
+        "sequence": 9,
+        "tool_call_id": "call_597110",
+        "name": "bash",
+        "arguments": {
+          "command": "python skills/csv-quality/scripts/check_csv.py --input data/not-found.csv --max-hours 8"
+        },
+        "result": {
+          "ok": true,
+          "exit_code": 1,
+          "stdout": "",
+          "stderr": "ERROR: Không đọc được file data/not-found.csv: No such file or directory\n",
+          "timed_out": false,
+          "truncated": false
+        }
+      }
+    ],
+    "trace": "evidence/stage-04-script-skill_missing_file.jsonl",
+    "input_sha256_before": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "input_sha256_after": "744832f0d0a96b57046be345240c08064a70929087e8eeb60d8047b38dfe5fde",
+    "model": "gemini-3.5-flash-lite"
+  }
+]

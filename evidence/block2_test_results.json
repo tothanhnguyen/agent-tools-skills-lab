@@ -1,0 +1,18 @@
+[
+  {
+    "stage": "stage-03-bash",
+    "exit_code": 0,
+    "passed": 48,
+    "log": "evidence/stage-03-bash_pytest.txt",
+    "platform": "linux",
+    "python": "3.12.15"
+  },
+  {
+    "stage": "stage-04-script-skill",
+    "exit_code": 0,
+    "passed": 73,
+    "log": "evidence/stage-04-script-skill_pytest.txt",
+    "platform": "linux",
+    "python": "3.12.15"
+  }
+]

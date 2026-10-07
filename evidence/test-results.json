@@ -1,0 +1,17 @@
+{
+  "stage-01-files": {
+    "passed": 43,
+    "skipped": 4,
+    "failed": 0
+  },
+  "stage-02-skills": {
+    "passed": 52,
+    "skipped": 4,
+    "failed": 0
+  },
+  "skip_reason": "Windows error 1314 prevents symlink fixture creation; these cases remain unverified",
+  "directory_junction_regression": "passed in both stages",
+  "command": "uv run --locked pytest -q -rs",
+  "python": "3.14.3",
+  "execution_root": "C:\\Study\\AI Agentic\\agent-tools-skills-lab"
+}

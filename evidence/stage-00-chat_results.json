@@ -1,0 +1,19 @@
+[
+  {
+    "case": "A",
+    "prompt": "Tôi mua ngày 28/09/2026, yêu cầu hoàn ngày 06/10/2026, chưa kích hoạt. Tôi có được hoàn không?",
+    "answer": "Tôi không có tool truy cập vào hệ thống dữ liệu hoặc chính sách đổi trả của cửa hàng để kiểm tra trường hợp của bạn. Do đó, tôi không thể xác định chính xác bạn có được hoàn tiền hay không. \n\nTuy nhiên, tính từ ngày mua (28/09/2026) đến ngày yêu cầu hoàn (06/10/2026) là **8 ngày**, và sản phẩm **chưa kích hoạt**. Bạn vui lòng cung cấp thông tin này trực tiếp cho bộ phận hỗ trợ khách hàng của nơi bạn mua để được tư vấn chính xác theo chính sách hiện hành nhé.",
+    "error": null,
+    "conversation_id": "6dc5a471a9f84d209f4d9939fda59d07",
+    "run_id": "a0420e00525245b782d83c5de27f8711",
+    "model_calls": 1,
+    "tool_calls": 0,
+    "inventory": {
+      "skills": [],
+      "resources": []
+    },
+    "tools": [],
+    "trace": "evidence\\stage-00-chat_A.jsonl",
+    "model": "gemini-3.5-flash-lite"
+  }
+]

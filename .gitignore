@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Private configuration; publish only placeholder examples.
+.env
+.env.*
+!.env.example
+
+# Local work-session notes and orchestration, not assignment deliverables.
+/TESTING_GUIDE.md
+/block1-analysis.md
+/verification.md
+/STAGE-DIFFS.md
+/scripts/*
+!/scripts/start_bash_stages.ps1
+/evidence/block2_protected_sha256.json
+
+# Editor, system and temporary files.
+.DS_Store
+Thumbs.db
+*.log
+*.tmp

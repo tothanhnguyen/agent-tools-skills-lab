@@ -1,0 +1,66 @@
+[
+  {
+    "case": "valid_directory",
+    "path": "data/policies",
+    "result": {
+      "ok": true,
+      "path": "data/policies",
+      "entries": [
+        {
+          "name": "policy-before-oct.md",
+          "path": "data/policies/policy-before-oct.md",
+          "type": "file"
+        },
+        {
+          "name": "policy-from-oct.md",
+          "path": "data/policies/policy-from-oct.md",
+          "type": "file"
+        }
+      ]
+    }
+  },
+  {
+    "case": "file",
+    "path": "data/policies/policy-before-oct.md",
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "NOT_A_DIRECTORY",
+        "message": "Đường dẫn không phải thư mục: data/policies/policy-before-oct.md"
+      }
+    }
+  },
+  {
+    "case": "missing",
+    "path": "data/policies/does-not-exist",
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "FILE_NOT_FOUND",
+        "message": "Không tìm thấy thư mục: data/policies/does-not-exist"
+      }
+    }
+  },
+  {
+    "case": "escape",
+    "path": "../outside-demo",
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "PATH_OUTSIDE_WORKSPACE",
+        "message": "Đường dẫn thoát ra ngoài workspace: ../outside-demo"
+      }
+    }
+  },
+  {
+    "case": "absolute",
+    "path": "C:\\Study\\AI Agentic\\agent-tools-skills-lab\\stage-02-skills\\workspace\\data\\policies",
+    "result": {
+      "ok": false,
+      "error": {
+        "code": "PATH_OUTSIDE_WORKSPACE",
+        "message": "Không chấp nhận đường dẫn tuyệt đối: C:\\Study\\AI Agentic\\agent-tools-skills-lab\\stage-02-skills\\workspace\\data\\policies. Dùng đường dẫn tương đối workspace."
+      }
+    }
+  }
+]
